@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block title %}{{ _("المستخدمون") }}{% endblock %}
+{% block page_title %}{{ _("إدارة المستخدمين") }}{% endblock %}
+{% block content %}
+
+<div class="panel">
+  <div class="panel-head">
+    <h3>{{ icon("users") }} {{ _("المستخدمون") }}</h3>
+    <button class="btn btn-teal btn-sm" onclick="openModal('addModal')">{{ icon("plus") }} {{ _("مستخدم جديد") }}</button>
+  </div>
+  <div class="tbl-wrap">
+    <table class="tbl">
+      <thead><tr><th>{{ _("الاسم") }}</th><th class="num">{{ _("اسم الدخول") }}</th><th>{{ _("الصلاحية") }}</th><th>{{ _("سؤال الأمان") }}</th><th class="num">{{ _("تاريخ الإضافة") }}</th><th class="num">{{ _("إجراءات") }}</th></tr></thead>
+      <tbody>
+        {% for u in users %}
+        <tr>
+          <td>{{ u.full_name }}</td>
+          <td class="num">{{ u.username }}</td>
+          <td>{% if u.role == 'admin' %}<span class="badge posted">{{ _("مدير النظام") }}</span>
+              {% elif u.role == 'accountant' %}<span class="badge region">{{ _("محاسب") }}</span>
+              {% else %}<span class="badge gray">{{ _("مشاهدة فقط") }}</span>{% endif %}</td>
+          <td>{% if u.security_question %}<span class="badge posted" title="{{ u.security_question }}">{{ _("مُفعّل") }}</span>
+              {% else %}<span class="badge draft">{{ _("بدون سؤال") }}</span>{% endif %}</td>
+          <td class="num">{{ u.created_at }}</td>
+          <td class="num">
+            <button class="btn btn-sm btn-dark" onclick="setSecurity({{ u.id }}, '{{ u.username }}', '{{ u.security_question }}')">{{ icon("shield-check") }} {{ _("سؤال أمان") }}</button>
+            <button class="btn btn-sm btn-teal" onclick="resetPw({{ u.id }}, '{{ u.username }}')">{{ icon("key-round") }} {{ _("كلمة مرور") }}</button>
+            {% if u.id != user.id %}
+            <button class="btn btn-sm btn-red" onclick="delUser({{ u.id }}, '{{ u.username }}')">{{ icon("trash-2") }}</button>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="panel-body hint">
+    {{ icon("lightbulb") }} {{ _("سؤال الأمان يُفعّل «نسيت كلمة المرور؟» لصاحب الحساب حتى يستعيد دخوله بنفسه عند نسيان كلمة المرور.") }}
+    {% if web_mode %}
+    <br>{{ icon("lightbulb") }} {{ _("باقي أعضاء الفريق يفتحون السيستم من أي جهاز أو موبايل على الرابط:") }} <b style="color:var(--gold);direction:ltr;display:inline-block">{{ request.host_url }}</b>
+    <br>{{ icon("key-round") }} {{ _("كلمة المرور اللي بتحددها لأي مستخدم مؤقتة — هيُطلب منه يغيّرها أول ما يدخل.") }}
+    {% else %}
+    <br>{{ icon("lightbulb") }} {{ _("باقي أعضاء الفريق يفتحون السيستم من أجهزتهم عبر متصفح الإنترنت على عنوان:") }} <b style="color:var(--gold);direction:ltr;display:inline-block">{{ _("http://IP-الجهاز-الرئيسي:5000") }}</b>
+    {% endif %}
+  </div>
+</div>
+
+<!-- مودال إضافة مستخدم -->
+<div class="modal-overlay" id="addModal">
+  <div class="modal">
+    <div class="modal-head"><h3>{{ _("مستخدم جديد") }}</h3><button class="modal-close" data-close-modal>×</button></div>
+    <div class="modal-body">
+      <div class="field"><label>{{ _("الاسم الكامل *") }}</label><input id="u-name" type="text"></div>
+      <div class="field"><label>{{ _("اسم الدخول *") }}</label><input id="u-user" type="text" placeholder="{{ _("بحروف إنجليزية") }}"></div>
+      <div class="field"><label>{{ _("كلمة المرور *") }}</label><input id="u-pass" type="text"></div>
+      <div class="field"><label>{{ _("سؤال الأمان (اختياري — لتفعيل «نسيت كلمة المرور؟»)") }}</label><input id="u-q" type="text" placeholder="{{ _("مثال: اسم مدرستك الثانوية؟") }}"></div>
+      <div class="field"><label>{{ _("إجابة سؤال الأمان (اختياري)") }}</label><input id="u-ans" type="text"></div>
+      <div class="field"><label>{{ _("الصلاحية") }}</label>
+        <select id="u-role">
+          <option value="accountant">{{ _("محاسب (كل الصلاحيات المحاسبية)") }}</option>
+          <option value="admin">{{ _("مدير النظام") }}</option>
+          <option value="viewer">{{ _("مشاهدة فقط") }}</option>
+        </select></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-gold" onclick="addUser()">{{ _("حفظ") }}</button>
+      <button class="btn btn-dark" data-close-modal>{{ _("إلغاء") }}</button>
+    </div>
+  </div>
+</div>
+
+<!-- مودال سؤال الأمان -->
+<div class="modal-overlay" id="secModal">
+  <div class="modal">
+    <div class="modal-head"><h3 id="sec-title">{{ _("سؤال الأمان") }}</h3><button class="modal-close" data-close-modal>×</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="sec-id">
+      <div class="field"><label>{{ _("سؤال الأمان") }}</label><input id="sec-q" type="text" placeholder="{{ _("مثال: اسم مدرستك الثانوية؟") }}"></div>
+      <div class="field"><label>{{ _("إجابة سؤال الأمان") }}</label><input id="sec-ans" type="text"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-gold" onclick="saveSecurity()">{{ _("حفظ") }}</button>
+      <button class="btn btn-dark" data-close-modal>{{ _("إلغاء") }}</button>
+    </div>
+  </div>
+</div>
+
+<!-- مودال كلمة المرور -->
+<div class="modal-overlay" id="pwModal">
+  <div class="modal">
+    <div class="modal-head"><h3 id="pw-title">{{ _("كلمة مرور جديدة") }}</h3><button class="modal-close" data-close-modal>×</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="pw-id">
+      <div class="field"><label>{{ _("كلمة المرور الجديدة") }}</label><input id="pw-new" type="text"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-gold" onclick="savePw()">{{ _("تغيير") }}</button>
+      <button class="btn btn-dark" data-close-modal>{{ _("إلغاء") }}</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function addUser() {
+  try {
+    await api('/api/users', { method: 'POST', body: {
+      full_name: $('#u-name').value.trim(),
+      username: $('#u-user').value.trim(),
+      password: $('#u-pass').value,
+      role: $('#u-role').value,
+      security_question: $('#u-q').value.trim(),
+      security_answer: $('#u-ans').value.trim(),
+    }});
+    closeModal('addModal');
+    toast(T("تمت إضافة المستخدم"));
+    setTimeout(() => location.reload(), 800);
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+function setSecurity(id, username, question) {
+  $('#sec-title').textContent = `${T("سؤال الأمان لـ")} ${username}`;
+  $('#sec-id').value = id;
+  $('#sec-q').value = question || '';
+  $('#sec-ans').value = '';
+  openModal('secModal');
+}
+
+async function saveSecurity() {
+  const q = $('#sec-q').value.trim();
+  const a = $('#sec-ans').value.trim();
+  if (!q) return toast(T("اكتب سؤال الأمان"), 'err');
+  if (!a) return toast(T("اكتب إجابة سؤال الأمان"), 'err');
+  try {
+    await api(`/api/users/${$('#sec-id').value}/security`, { method: 'POST', body: { security_question: q, security_answer: a } });
+    closeModal('secModal');
+    toast(T("تم حفظ سؤال الأمان"));
+    setTimeout(() => location.reload(), 800);
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+function resetPw(id, username) {
+  $('#pw-title').textContent = `${T("كلمة مرور جديدة لـ")} ${username}`;
+  $('#pw-id').value = id;
+  $('#pw-new').value = '';
+  openModal('pwModal');
+}
+
+async function savePw() {
+  try {
+    await api(`/api/users/${$('#pw-id').value}/password`, { method: 'POST', body: { password: $('#pw-new').value } });
+    closeModal('pwModal');
+    toast(T("تم تغيير كلمة المرور"));
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function delUser(id, username) {
+  if (!await confirmDlg(`${T("حذف المستخدم")} ${username}${T("؟")}`)) return;
+  try {
+    await api('/api/users/' + id, { method: 'DELETE' });
+    toast(T("تم حذف المستخدم"));
+    setTimeout(() => location.reload(), 700);
+  } catch (e) { toast(e.message, 'err'); }
+}
+</script>
+{% endblock %}

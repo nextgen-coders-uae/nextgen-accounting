@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}" dir="{{ dir }}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ _("استعادة كلمة المرور") }} — {{ product.name }}</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/mark.png') }}">
+  <script>try{var th=localStorage.getItem('theme');if(th)document.documentElement.dataset.theme=th;}catch(e){}</script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="login-card">
+      {% set other = 'en' if lang == 'ar' else 'ar' %}
+      <a class="login-lang" href="/lang/{{ other }}?next={{ request.path|urlencode }}">{{ LANGS[other].name }}</a>
+      <img class="login-logo" src="{{ url_for('static', filename='img/logo.png') }}" alt="{{ product.vendor_en }}">
+      <h1>{{ _("استعادة كلمة المرور") }}</h1>
+      <div class="sub">{{ company_name or product.name }}</div>
+
+      {% if error %}<div class="alert err">{{ error }}</div>{% endif %}
+      {% if ok %}<div class="alert ok">{{ ok }}</div>{% endif %}
+
+      {% if step == 'done' %}
+        <div style="text-align:center"><a class="btn btn-gold" href="/login">{{ _("تسجيل الدخول") }}</a></div>
+      {% elif step == 'answer' %}
+        <form method="post">
+          <input type="hidden" name="act" value="setup">
+          <input type="hidden" name="username" value="{{ username }}">
+          <div class="field">
+            <label>{{ _("سؤال الأمان") }}</label>
+            <div class="hint" style="font-size:15px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;color:var(--text)">{{ question }}</div>
+          </div>
+          <div class="field">
+            <label>{{ _("إجابة سؤال الأمان") }}</label>
+            <input type="text" name="answer" required autofocus autocomplete="off">
+          </div>
+          <div class="field">
+            <label>{{ _("كلمة المرور الجديدة (8 أحرف على الأقل، حروف وأرقام)") }}</label>
+            <input type="password" name="new_password" required minlength="8" autocomplete="new-password">
+          </div>
+          <button class="btn btn-gold btn-block" type="submit">{{ _("تغيير كلمة المرور") }}</button>
+        </form>
+      {% else %}
+        <form method="post">
+          <div class="field">
+            <label>{{ _("اسم المستخدم") }}</label>
+            <input type="text" name="username" required autofocus autocomplete="username" value="{{ username }}">
+          </div>
+          <button class="btn btn-gold btn-block" type="submit">{{ _("متابعة") }}</button>
+        </form>
+      {% endif %}
+
+      <p style="margin-top:18px;text-align:center">
+        <a href="/login" style="color:var(--gold)">{{ _("العودة لتسجيل الدخول") }}</a>
+      </p>
+      <p style="margin-top:20px;color:var(--muted);font-size:12px;line-height:1.8">
+        © {{ _("جميع الحقوق محفوظة") }} — <b style="color:var(--gold)">{{ product.vendor }}</b><br>
+        <a href="{{ product.website }}" target="_blank" rel="noopener" style="color:var(--muted)">{{ product.website_label }}</a>
+      </p>
+    </div>
+  </div>
+</body>
+</html>

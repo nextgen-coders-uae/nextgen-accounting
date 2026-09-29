@@ -1,0 +1,340 @@
+{% extends "base.html" %}
+{% block title %}{{ _("الإعدادات") }}{% endblock %}
+{% block page_title %}{{ _("الإعدادات") }}{% endblock %}
+{% block content %}
+
+<div class="grid-2">
+  {% if user.role == 'admin' %}
+  <div class="panel">
+    <div class="panel-head"><h3>{{ icon("building-2") }} {{ _("إعدادات عامة") }}</h3></div>
+    <div class="panel-body">
+      <div class="field"><label>{{ _("اسم الشركة (يظهر في رأس التقارير المصدَّرة)") }}</label>
+        <input id="s-company" type="text" value="{{ company_name }}"></div>
+      <div class="field"><label>{{ _("بداية فترة التقارير") }}</label>
+        <input id="s-from" type="date" value="{{ period_from }}"></div>
+      <div class="field"><label>{{ _("نهاية فترة التقارير") }}</label>
+        <input id="s-to" type="date" value="{{ period_to }}"></div>
+      <button class="btn btn-gold" onclick="saveSettings()">{{ icon("save") }} {{ _("حفظ الإعدادات") }}</button>
+      <div class="field" style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border)">
+        <button class="btn btn-dark" onclick="localizeAccounts()">{{ icon("languages") }} {{ _("تحويل أسماء الحسابات الافتراضية للغة الحالية") }}</button>
+        <div class="hint" style="font-size:12px;margin-top:6px;color:var(--muted)">{{ _("يغيّر أسماء حسابات دليل البداية (الصندوق، البنوك...) لنفس لغة الواجهة. الحسابات اللي غيّرت اسمها بنفسك مش هتتأثر.") }}</div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if user.role == 'admin' %}
+  <div class="panel">
+    <div class="panel-head"><h3>{{ icon("signature") }} {{ _("التواقيع في التقارير المصدَّرة") }}</h3>
+      <button class="btn btn-teal btn-sm" onclick="addSigRow()">{{ icon("plus") }} {{ _("إضافة توقيع") }}</button>
+    </div>
+    <div class="panel-body">
+      <div class="alert ok" style="font-size:12.5px">
+        {{ _("أول توقيع «المحاسب» بياخد اسم المستخدم اللي عمل التصدير تلقائيًا. باقي التواقيع (المسمى + الاسم) تقدر تعدّلها وتضيفها وتحذفها من هنا — بتظهر في كل التقارير.") }}
+      </div>
+      <div class="sig-list" id="sig-list"></div>
+      <button class="btn btn-gold" style="margin-top:6px" onclick="saveSettings()">{{ icon("save") }} {{ _("حفظ الإعدادات") }}</button>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if user.role == 'admin' %}
+  <div class="panel">
+    <div class="panel-head"><h3>{{ icon("archive") }} {{ _("النسخ الاحتياطية") }}</h3>
+      <button class="btn btn-gold btn-sm" onclick="doBackup()">{{ icon("download") }} {{ _("نسخة احتياطية الآن") }}</button>
+      <button class="btn btn-teal btn-sm" onclick="document.getElementById('restore-file').click()">{{ icon("upload") }} {{ _("استعادة من ملف") }}</button>
+      <input type="file" id="restore-file" accept=".db" style="display:none" onchange="restoreFromFile(this)">
+    </div>
+    <div class="panel-body">
+      <div class="alert ok" style="font-size:12.5px">
+        {% if web_mode %}
+        {{ icon("check") }} {{ _("نسخة أوتوماتيك بتتعمل كل شهر جديد من تلقاء نفسها، وبنحتفظ بآخر 24 نسخة — تقدر تنزّل أي نسخة على جهازك من الجدول تحت.") }}
+        <br>{{ icon("shield-check") }} {{ _("بالإضافة لكده، بيتم أخذ نسخة يومية تلقائية من بياناتك وحفظها خارج السيستم.") }}
+        {% else %}
+        {{ icon("check") }} {{ _("نسخة أوتوماتيك بتتعمل كل شهر جديد من تلقاء نفسها، وبنحتفظ بآخر 24 نسخة. الملفات محفوظة على جهاز السيرفر داخل مجلد") }} <b>instance\backups</b>
+        {% endif %}
+        <br>{{ icon("rotate-ccw") }} {{ _("زر «استعادة» يسوي نسخة أمان تلقائية للوضع الحالي أولاً، ثم يصدّر بيانات النسخة المختارة محل قاعدة البيانات الجارية.") }}
+        <br>{{ icon("upload") }} {{ _("زر «استعادة من ملف» بيستعيد من ملف .db اختارته من عندك على الجهاز (بيتأكّد إنه ملف قاعدة بيانات صحيح قبل ما يستعمله).") }}
+      </div>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th class="num">{{ _("اسم النسخة") }}</th><th class="num">{{ _("التاريخ والوقت") }}</th><th class="num">{{ _("الحجم") }}</th><th class="num">{{ _("تنزيل") }}</th></tr></thead>
+          <tbody id="backups-body"><tr><td colspan="4" class="empty-state">{{ _("جارٍ التحميل...") }}</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="panel">
+    <div class="panel-head"><h3>{{ icon("key-round") }} {{ _("تغيير كلمة المرور الخاصة بي") }}</h3></div>
+    <div class="panel-body">
+      <div class="field"><label>{{ _("كلمة المرور الحالية") }}</label><input id="p-old" type="password"></div>
+      <div class="field"><label>{{ _("كلمة المرور الجديدة") }}</label><input id="p-new" type="password"></div>
+      <button class="btn btn-teal" onclick="changePw()">{{ _("تغيير كلمة المرور") }}</button>
+    </div>
+  </div>
+
+  {% if user.role == 'admin' %}
+  <div class="panel" style="grid-column:span 2">
+    <div class="panel-head"><h3>{{ icon("map") }} {{ _("المناطق والفرع") }}</h3>
+      <button class="btn btn-teal btn-sm" onclick="openRegionModal()">{{ icon("plus") }} {{ _("إضافة منطقة") }}</button>
+    </div>
+    <div class="panel-body">
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead>
+            <tr><th class="num">{{ _("م") }}</th><th>{{ _("اسم المنطقة") }}</th><th class="num">{{ _("الحالة") }}</th><th class="num">{{ _("قيود مرتبطة") }}</th><th class="num">{{ _("إجراءات") }}</th></tr>
+          </thead>
+          <tbody id="regions-body"></tbody>
+        </table>
+      </div>
+      <div id="region-msg" style="margin-top:10px"></div>
+    </div>
+  </div>
+
+  <!-- مودال إضافة/تعديل منطقة -->
+  <div class="modal-overlay" id="regionModal">
+    <div class="modal">
+      <div class="modal-head"><h3 id="region-modal-title">{{ _("إضافة منطقة جديدة") }}</h3>
+        <button class="modal-close" data-close-modal>×</button></div>
+      <div class="modal-body">
+        <div class="field"><label>{{ _("اسم المنطقة / الفرع") }}</label>
+          <input id="region-name" type="text" placeholder="{{ _("مثال: المنطقة الغربية") }}"></div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-gold" id="region-save-btn" onclick="saveRegion()">{{ icon("save") }} {{ _("حفظ") }}</button>
+        <button class="btn btn-dark" data-close-modal>{{ _("إلغاء") }}</button>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="panel">
+    <div class="panel-head"><h3>{{ icon("info") }} {{ _("عن السيستم") }}</h3></div>
+    <div class="panel-body hint" style="font-size:13px;line-height:2.1">
+      <p>{{ icon("book-marked") }} {{ _("دليل حسابات + استيراد/تصدير Excel بصيغة xlsx") }}</p>
+      <p>{{ icon("notebook-pen") }} {{ _("دفتر اليومية برقم حركة وترحيل القيود") }}</p>
+      <p>{{ icon("book-open") }} {{ _("الأستاذ العام بفلترة رقم الحساب والمنطقة") }}</p>
+      <p>{{ icon("scale") }} {{ _("ميزان المراجعة بالأرصدة الافتتاحية") }}</p>
+      <p>{{ icon("users") }} {% if web_mode %}{{ _("يعمل عليه عدة مستخدمين في نفس الوقت من أي مكان عبر الإنترنت") }}{% else %}{{ _("يعمل عليه عدة مستخدمين في نفس الوقت عبر الشبكة") }}{% endif %}</p>
+      <div class="vendor-box">
+      <img src="{{ url_for('static', filename='img/mark.png') }}" alt="">
+      <div>
+        <b>{{ product.name }} — {{ _("الإصدار") }} {{ product.version }}</b>
+        <div>{{ _("تطوير ودعم فني:") }} <b>{{ product.vendor }} ({{ product.vendor_en }})</b></div>
+        <div>{{ _("واتساب الدعم:") }}
+          {% for w in product.whatsapp %}<a href="{{ w.link }}" target="_blank" rel="noopener" dir="ltr">{{ w.number }}</a> ({{ w.label }}){% if not loop.last %} · {% endif %}{% endfor %}
+        </div>
+        <div>{{ _("الموقع:") }} <a href="{{ product.website }}" target="_blank" rel="noopener">{{ product.website_label }}</a></div>
+        <small>{{ product.licence }}</small>
+      </div>
+    </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+{% if user.role == 'admin' %}
+function fmtSize(b) {
+  return b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB';
+}
+
+async function loadBackups() {
+  try {
+    const d = await api('/api/backups');
+    const tb = $('#backups-body');
+    if (!d.backups.length) {
+      tb.innerHTML = ('<tr><td colspan="4" class="empty-state">' + T("لا توجد نسخ بعد") + '</td></tr>');
+      return;
+    }
+    tb.innerHTML = d.backups.map(b => `
+      <tr>
+        <td class="num" style="direction:ltr">${esc(b.name)}</td>
+        <td class="num">${esc(b.modified)}</td>
+        <td class="num">${fmtSize(b.size)}</td>
+        <td class="num"><a class="btn btn-sm btn-teal" href="/api/backups/${encodeURIComponent(b.name)}"><svg class="i" aria-hidden="true"><use href="#i-download"></use></svg> ${T("تنزيل")}</a>
+        <button class="btn btn-sm btn-gold" onclick="restoreBackup('${encodeURIComponent(b.name)}')"><svg class="i" aria-hidden="true"><use href="#i-rotate-ccw"></use></svg> ${T("استعادة")}</button></td>
+      </tr>`).join('');
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function doBackup() {
+  if (!await confirmDlg(T("إنشاء نسخة احتياطية جديدة الآن؟"))) return;
+  try {
+    const d = await api('/api/backup', { method: 'POST' });
+    toast(T("تم إنشاء النسخة بنجاح"));
+    location.href = '/api/backups/' + encodeURIComponent(d.name);
+    loadBackups();
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function restoreBackup(name) {
+  name = decodeURIComponent(name);
+  if (!await confirmDlg(T("استعادة النسخة «{name}»؟\nستُحفظ نسخة أمان تلقائية للوضع الحالي قبل الاستعادة، ثم تُستعاد بيانات النسخة المختارة. متابعة؟", {name}))) return;
+  try {
+    const d = await api('/api/restore/' + encodeURIComponent(name), { method: 'POST' });
+    toast(d.message || (T("تمت الاستعادة")));
+    setTimeout(() => location.reload(), 1200);
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function restoreFromFile(input) {
+  const file = input.files[0];
+  input.value = '';
+  if (!file) return;
+  if (!await confirmDlg(T("استعادة النسخة من الملف «{name}»؟\nستُحفظ نسخة أمان تلقائية للوضع الحالي قبل الاستعادة، ثم تُستعاد بيانات الملف المختار. متابعة؟", {name: file.name}))) return;
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const res = await fetch('/api/restore-file', { method: 'POST', body: fd });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || T("حدث خطأ غير متوقع"));
+    toast(data.message || (T("تمت الاستعادة")));
+    setTimeout(() => location.reload(), 1800);
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+loadBackups();
+
+let editingRegionId = null;
+
+function openRegionModal(id, name) {
+  editingRegionId = id || null;
+  $('#region-modal-title').textContent = id ? T("تعديل المنطقة") : T("إضافة منطقة جديدة");
+  $('#region-name').value = name || '';
+  openModal('regionModal');
+}
+
+async function loadRegions() {
+  try {
+    const d = await api('/api/regions');
+    const tb = $('#regions-body');
+    if (!d.regions.length) {
+      tb.innerHTML = ('<tr><td colspan="5" class="empty-state">' + T("لا توجد مناطق بعد") + '</td></tr>');
+      return;
+    }
+    tb.innerHTML = d.regions.map(r => `
+      <tr>
+        <td class="num">${r.id}</td>
+        <td>${esc(r.name)}${r.is_active ? '' : (' <span class="badge draft">' + T("متعطّل") + '</span>')}</td>
+        <td class="num">${r.is_active ? ('<span class="badge posted">' + T("نشط") + '</span>') : ('<span class="badge draft">' + T("متعطّل") + '</span>')}</td>
+        <td class="num">${r.usage_count > 0 ? r.usage_count : '—'}</td>
+        <td class="num" style="white-space:nowrap">
+          <button class="btn btn-sm btn-dark act-btn" title="${T("تعديل الاسم")}" onclick="openRegionModal(${r.id}, '${esc(r.name)}')"><svg class="i" aria-hidden="true"><use href="#i-pencil"></use></svg></button>
+          ${r.is_active
+            ? `<button class="btn btn-sm btn-gold act-btn" title="${T("تعطيل")}" onclick="toggleRegion(${r.id}, 'deactivate')">⏸</button>`
+            : `<button class="btn btn-sm btn-teal act-btn" title="${T("تفعيل")}" onclick="toggleRegion(${r.id}, 'activate')">▶</button>`}
+          ${r.usage_count > 0
+            ? `<button class="btn btn-sm btn-dark act-btn" title="${T("فيها قيود — مش هتتحذف")}" style="opacity:0.4;cursor:not-allowed"><svg class="i" aria-hidden="true"><use href="#i-trash-2"></use></svg></button>`
+            : `<button class="btn btn-sm btn-red act-btn" title="${T("حذف نهائي")}" onclick="delRegion(${r.id}, '${esc(r.name)}')"><svg class="i" aria-hidden="true"><use href="#i-trash-2"></use></svg></button>`}
+        </td>
+      </tr>`).join('');
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function saveRegion() {
+  const name = $('#region-name').value.trim();
+  if (!name) return toast(T("اكتب اسم المنطقة"), 'err');
+  try {
+    if (editingRegionId)
+      await api(`/api/regions/${editingRegionId}`, { method: 'PUT', body: { name } });
+    else
+      await api('/api/regions', { method: 'POST', body: { name } });
+    closeModal('regionModal');
+    toast(editingRegionId ? T("تم تعديل الاسم") : T("تمت الإضافة"));
+    loadRegions();
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function toggleRegion(id, action) {
+  try {
+    await api(`/api/regions/${id}/${action}`, { method: 'POST' });
+    toast(action === 'deactivate' ? T("تم التعطيل") : T("تم التفعيل"));
+    loadRegions();
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function delRegion(id, name) {
+  if (!await confirmDlg(`${T("حذف المنطقة «")}${name}${T("» نهائيًا؟")}`)) return;
+  try {
+    await api(`/api/regions/${id}`, { method: 'DELETE' });
+    toast(T("تم الحذف"));
+    loadRegions();
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+loadRegions();
+{% endif %}
+
+{% if user.role == 'admin' %}
+const SIGS = {{ signatures | tojson }};
+function renderSigs() {
+  const c = $('#sig-list');
+  if (!c) return;
+  c.innerHTML = SIGS.map((s, i) => `
+    <div class="sig-row" data-i="${i}">
+      <input class="sig-title" placeholder="${T("المسمى الوظيفي (مثال: مدير إدارة الميزانية)")}" value="${esc(s.title || '')}">
+      <input class="sig-name" placeholder="${T("الاسم (مثال: محاسب / محمد علي)")}" value="${esc(s.name || '')}">
+      <button class="btn btn-sm btn-red" title="${T("حذف التوقيع")}" onclick="removeSigRow(${i})"><svg class="i" aria-hidden="true"><use href="#i-trash-2"></use></svg></button>
+    </div>`).join('');
+  if (!SIGS.length)
+    c.innerHTML = ('<p class="empty-state">' + T("مفيش تواقيع إضافية — أول توقيع (المحاسب) ثابت تلقائيًا") + '</p>');
+}
+function addSigRow() { SIGS.push({ title: '', name: '' }); renderSigs(); }
+function removeSigRow(i) { SIGS.splice(i, 1); renderSigs(); }
+renderSigs();
+
+async function saveSettings() {
+  try {
+    const sigs = SIGS.map((s, i) => {
+      const row = document.querySelector(`.sig-row[data-i="${i}"]`);
+      return {
+        title: row ? row.querySelector('.sig-title').value.trim() : s.title,
+        name: row ? row.querySelector('.sig-name').value.trim() : s.name,
+      };
+    }).filter(s => s.title && s.name);
+    await api('/api/settings', { method: 'POST', body: {
+      company_name: $('#s-company').value.trim(),
+      period_from: $('#s-from').value,
+      period_to: $('#s-to').value,
+      signatures: sigs,
+    }});
+    toast(T("تم حفظ الإعدادات"));
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function localizeAccounts() {
+  if (!await confirmDlg(T("تحويل أسماء الحسابات الافتراضية للغة الحالية؟"))) return;
+  try {
+    const d = await api('/api/settings/localize-accounts', { method: 'POST' });
+    toast(T("تم تحويل {n} حساب", { n: d.changed }));
+  } catch (e) { toast(e.message, 'err'); }
+}
+{% else %}
+async function saveSettings() {
+  try {
+    await api('/api/settings', { method: 'POST', body: {
+      company_name: $('#s-company').value.trim(),
+      period_from: $('#s-from').value,
+      period_to: $('#s-to').value,
+    }});
+    toast(T("تم حفظ الإعدادات"));
+  } catch (e) { toast(e.message, 'err'); }
+}
+{% endif %}
+
+async function changePw() {
+  try {
+    if (!$('#p-old').value || !$('#p-new').value) return toast(T("املأ الخانتين"), 'err');
+    if ($('#p-new').value.length < 8) return toast(T("كلمة المرور الجديدة 8 أحرف على الأقل"), 'err');
+    await api('/api/me/password', { method: 'POST', body: { old: $('#p-old').value, new: $('#p-new').value } });
+    toast(T("تم تغيير كلمة المرور بنجاح"));
+    $('#p-old').value = ''; $('#p-new').value = '';
+  } catch (e) { toast(e.message, 'err'); }
+}
+</script>
+{% endblock %}
